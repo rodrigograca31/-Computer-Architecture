@@ -3,6 +3,16 @@
 import sys
 import re
 
+LDI = 0b10000010  # Load "immediate"
+ADD = 0b10100000  # ALU function
+SUB = 0b10100001  # ALU function
+MUL = 0b10100010  # ALU function
+DIV = 0b10100011  # ALU function
+MOD = 0b10100100  # ALU function
+PRN = 0b01000111  # Print
+HLT = 0b00000001  # Halt
+ZERO = 0  # Halt
+
 
 class CPU:
     """Main CPU class."""
@@ -13,7 +23,17 @@ class CPU:
         self.pc = 0             # Program Counter, address of the currently executing instruction
         self.reg = [0] * 8      # Registers, R0-R8, to hold values
         self.ram = [0] * 256    # RAM to load the program into.
-        pass
+        self.branchtable = {
+            LDI: self.LDI,
+            ADD: self.ADD,
+            SUB: self.SUB,
+            MUL: self.MUL,
+            DIV: self.DIV,
+            MOD: self.MOD,
+            PRN: self.PRN,
+            HLT: self.HLT,
+            ZERO: self.ZERO
+        }
 
     def load(self, args):
         """Load a program into memory."""
@@ -106,6 +126,36 @@ class CPU:
     def ram_write(self, pc, value):
         self.ram[pc] = value
 
+    def LDI(self, position, value):
+        self.reg[position] = value
+        pass
+
+    def ADD(self, a, b):
+        self.alu("ADD", a, b)
+
+    def SUB(self, a, b):
+        self.alu("SUB", a, b)
+
+    def MUL(self, a, b):
+        self.alu("MUL", a, b)
+
+    def DIV(self, a, b):
+        self.alu("DIV", a, b)
+
+    def MOD(self, a, b):
+        self.alu("MOD", a, b)
+
+    def PRN(self, position):
+        print(self.reg[position])
+
+    def HLT(self):
+        self.running = False  # This is not really needed
+        sys.exit(0)
+
+    def ZERO(self):
+        self.running = False  # This is not really needed
+        sys.exit(0)
+
     def run(self):
         """Run the CPU."""
         self.running = True
@@ -115,45 +165,29 @@ class CPU:
             # print("read:", self.pc)
             IR = self.ram_read(self.pc)  # Instruction Register
             # print(f"read:{IR:b}")
+
+            # This does a bitwise operation to shift the current IR (Instruction Register) value by 6 bits in this >> direction
+            # so that 0b10000010 it turns into 0b00000010
+            # and 0b01000010 turns into 0b00000001
+            # that tells us how many "jumps" we have to increase by (0, 1 or 2)
+            # In other words: it turns the 2 "highest" bits into a new binary 00, 01, 10 that tells us how many operants will follow the current instruction
+            op_size = (IR >> 6)
+
             operand_a = self.ram_read(self.pc + 1)
             operand_b = self.ram_read(self.pc + 2)
 
-            if IR == 0:
-                sys.exit(0)
-            elif IR == 0b10000010:  # LDI load "immediate"
-                # shift by 6 to know how many to read. like in morning repo
-                self.reg[operand_a] = operand_b
-                # does a bitwise operation to shift the current IR (Instruction Register) value by 6 bits
-                # so that 0b10000010 turns into 0b00000010
-                # and 0b01000010 turns into 0b00000001
-                # that tells us how many instructions we have to increase by (1 or 2)
-                op_size = (IR >> 6) + 1
-            elif IR == 0b10100000:
-                self.alu("ADD", operand_a, operand_b)
-                op_size = 3
-            elif IR == 0b10100001:
-                self.alu("SUB", operand_a, operand_b)
-                op_size = 3
-            elif IR == 0b10100010:
-                self.alu("MUL", operand_a, operand_b)
-                op_size = 3
-            elif IR == 0b10100011:
-                self.alu("DIV", operand_a, operand_b)
-                op_size = 3
-            elif IR == 0b10100100:
-                self.alu("MOD", operand_a, operand_b)
-                op_size = 3
+            # print(f"{IR:08b}")
+            # print(f"{self.branchtable[IR]}")
 
-            elif IR == 0b01000111:
-                print(self.reg[operand_a])
-                op_size = 2
-            elif IR == 0b00000001:
-                sys.exit(0)
-                op_size = 1
-                # running = False
-            else:
-                print(f"invalid instruction [{self.ram[self.pc]:b}]")
+            try:
+                if op_size == 0:
+                    self.branchtable[IR]()
+                elif op_size == 1:
+                    self.branchtable[IR](operand_a)
+                elif op_size == 2:
+                    self.branchtable[IR](operand_a, operand_b)
+            except KeyError:
+                print(f"invalid instruction [{self.ram[self.pc]:08b}]")
                 running = False
-                op_size = 1
 
-            self.pc += op_size
+            self.pc += (op_size+1)
