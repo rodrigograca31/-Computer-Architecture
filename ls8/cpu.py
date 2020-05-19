@@ -9,10 +9,10 @@ class CPU:
 
     def __init__(self):
         """Construct a new CPU."""
-        self.running = False
-        self.pc = 0
-        self.reg = [0] * 8
-        self.ram = [0] * 256
+        self.running = False    # Self explanatory
+        self.pc = 0             # Program Counter, address of the currently executing instruction
+        self.reg = [0] * 8      # Registers, R0-R8, to hold values
+        self.ram = [0] * 256    # RAM to load the program into.
         pass
 
     def load(self, args):
@@ -20,15 +20,25 @@ class CPU:
 
         address = 0
         if(len(args) == 2):
-            with open(args[1], "r") as file:
-                for instruction in file:
-                    instruction = re.sub(
-                        r'[^01]+', '', instruction.split("#")[0])
-                    # print(re.sub(r'[^01]+', '', instruction.split("#")[0]))
-                    if instruction != "":
-                        # self.ram[address] = bin(int("0b"+instruction, 2))
-                        self.ram_write(address, int(instruction, 2))
-                        address += 1
+            try:
+                with open(args[1], "r") as file:
+                    for instruction in file:
+                        instruction = re.sub(
+                            r'[^01]+', '', instruction.split("#")[0])
+                        # print(re.sub(r'[^01]+', '', instruction.split("#")[0]))
+                        if instruction != "":
+                            # self.ram[address] = bin(int("0b"+instruction, 2))
+                            # print(f"{int(instruction,2):08b}")
+                            self.ram_write(address, int(instruction, 2))
+                            address += 1
+            except FileNotFoundError:
+                print("file not found!")
+                sys.exit(2)
+        else:
+            print("usage: ./ls8.py <filename>")
+            sys.exit(1)
+
+        # print(self.ram)
 
         # For now, we've just hardcoded a program:
 
@@ -46,14 +56,15 @@ class CPU:
         #     self.ram[address] = instruction
         #     address += 1
 
+    '''
+    Arithmetic Logic Instructions
+    '''
+
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
 
         # print("Operation: ", op)
-        if op == "LDI":
-            self.reg[reg_a] = reg_b
-
-        elif op == "ADD":
+        if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
         elif op == "SUB":
             self.reg[reg_a] -= self.reg[reg_b]
@@ -63,11 +74,6 @@ class CPU:
             self.reg[reg_a] /= self.reg[reg_b]
         elif op == "MOD":
             self.reg[reg_a] %= self.reg[reg_b]
-
-        elif op == "PRN":
-            print(self.reg[reg_a])
-        elif op == "HLT":
-            exit()
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -103,7 +109,7 @@ class CPU:
     def run(self):
         """Run the CPU."""
         self.running = True
-        op_size = 0
+        op_size = 0  # operation size
 
         while self.running:
             # print("read:", self.pc)
@@ -113,10 +119,15 @@ class CPU:
             operand_b = self.ram_read(self.pc + 2)
 
             if IR == 0:
-                exit()
+                sys.exit(0)
             elif IR == 0b10000010:  # LDI load "immediate"
-                self.alu("LDI", operand_a, operand_b)
-                op_size = 3
+                # shift by 6 to know how many to read. like in morning repo
+                self.reg[operand_a] = operand_b
+                # does a bitwise operation to shift the current IR (Instruction Register) value by 6 bits
+                # so that 0b10000010 turns into 0b00000010
+                # and 0b01000010 turns into 0b00000001
+                # that tells us how many instructions we have to increase by (1 or 2)
+                op_size = (IR >> 6) + 1
             elif IR == 0b10100000:
                 self.alu("ADD", operand_a, operand_b)
                 op_size = 3
@@ -134,13 +145,12 @@ class CPU:
                 op_size = 3
 
             elif IR == 0b01000111:
-                self.alu("PRN", operand_a, operand_b)
+                print(self.reg[operand_a])
                 op_size = 2
-
             elif IR == 0b00000001:
-                self.alu("HLT", operand_a, operand_b)
+                sys.exit(0)
                 op_size = 1
-
+                # running = False
             else:
                 print(f"invalid instruction [{self.ram[self.pc]:b}]")
                 running = False
