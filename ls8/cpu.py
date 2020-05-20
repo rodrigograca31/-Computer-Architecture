@@ -3,7 +3,7 @@
 import sys
 import re
 
-LDI = 0b10000010  # Load "immediate"
+LDI = 0b10000010  # Load "Immediate"
 ADD = 0b10100000  # ALU function
 SUB = 0b10100001  # ALU function
 MUL = 0b10100010  # ALU function
@@ -11,6 +11,8 @@ DIV = 0b10100011  # ALU function
 MOD = 0b10100100  # ALU function
 PRN = 0b01000111  # Print
 HLT = 0b00000001  # Halt
+PUSH = 0b01000101  # Push
+POP = 0b01000110  # Pop
 ZERO = 0  # Halt
 
 
@@ -21,9 +23,13 @@ class CPU:
         """Construct a new CPU."""
         self.running = False    # Self explanatory
         self.pc = 0             # Program Counter, address of the currently executing instruction
-        self.reg = [0] * 8      # Registers, R0-R8, to hold values
+        self.reg = [0] * 8      # Registers, R0-R7, to hold values
+        # Register 7 is the Stack Pointer (index of register to know where the stack is at) self.reg[sp] += 1
+        self.sp = 7
+        # self.ram[self.reg[self.sp]] - 244 - Its the top of the stack and grows down
+        self.reg[self.sp] = 0xF4
         self.ram = [0] * 256    # RAM to load the program into.
-        self.branchtable = {
+        self.branchtable = {    # branchtable avoids if/elif statements by using an index to know which function to run
             LDI: self.LDI,
             ADD: self.ADD,
             SUB: self.SUB,
@@ -32,6 +38,8 @@ class CPU:
             MOD: self.MOD,
             PRN: self.PRN,
             HLT: self.HLT,
+            PUSH: self.PUSH,
+            POP: self.POP,
             ZERO: self.ZERO
         }
 
@@ -155,6 +163,14 @@ class CPU:
     def ZERO(self):
         self.running = False  # This is not really needed
         sys.exit(0)
+
+    def PUSH(self, position):
+        self.reg[self.sp] -= 1
+        self.ram[self.reg[self.sp]] = self.reg[position]
+
+    def POP(self, position):
+        self.reg[position] = self.ram[self.reg[self.sp]]
+        self.reg[self.sp] += 1
 
     def run(self):
         """Run the CPU."""
