@@ -13,7 +13,8 @@ PRN = 0b01000111  # Print
 HLT = 0b00000001  # Halt
 PUSH = 0b01000101  # Push
 POP = 0b01000110  # Pop
-ZERO = 0  # Halt
+CALL = 0b01010000  # Call
+RET = 0b00010001  # Return to
 
 
 class CPU:
@@ -40,7 +41,8 @@ class CPU:
             HLT: self.HLT,
             PUSH: self.PUSH,
             POP: self.POP,
-            ZERO: self.ZERO
+            CALL: self.CALL,
+            RET: self.RET
         }
 
     def load(self, args):
@@ -136,7 +138,6 @@ class CPU:
 
     def LDI(self, position, value):
         self.reg[position] = value
-        pass
 
     def ADD(self, a, b):
         self.alu("ADD", a, b)
@@ -160,16 +161,26 @@ class CPU:
         self.running = False  # This is not really needed
         sys.exit(0)
 
-    def ZERO(self):
-        self.running = False  # This is not really needed
-        sys.exit(0)
-
-    def PUSH(self, position):
+    # pushes a given register to the stack
+    def PUSH(self, register):
         self.reg[self.sp] -= 1
-        self.ram[self.reg[self.sp]] = self.reg[position]
+        self.ram[self.reg[self.sp]] = self.reg[register]
 
-    def POP(self, position):
-        self.reg[position] = self.ram[self.reg[self.sp]]
+    # pops from the stack into a given register
+    def POP(self, register):
+        self.reg[register] = self.ram[self.reg[self.sp]]
+        self.reg[self.sp] += 1
+
+    def CALL(self, register):
+        self.reg[self.sp] -= 1
+        # plus 2 because its the current instruction + the next one + the actual one it should come to later when it does RET
+        self.ram[self.reg[self.sp]] = self.pc + 2
+        # minus two because this the operation size (op_size) is 1 and +1 after
+        self.pc = self.reg[register] - 2
+
+    def RET(self):
+        # minus 1 because this the operation size (op_size) does +1 after
+        self.pc = self.ram[self.reg[self.sp]] - 1
         self.reg[self.sp] += 1
 
     def run(self):
