@@ -11,6 +11,7 @@ class CPU:
         """Construct a new CPU."""
         self.running = False    # Self explanatory
         self.PC = 0             # Program Counter, address of the currently executing instruction
+        self.FL = 0
         self.reg = [0] * 8      # Registers, R0-R7, to hold values
         # Register 7 is the Stack Pointer (index of register that knows where the stack is at) self.reg[sp] += 1
         self.sp = 7
@@ -29,10 +30,18 @@ class CPU:
             0b01000101: self.PUSH,  # Push
             0b01000110: self.POP,   # Pop
             0b01010000: self.CALL,  # Call
-            0b00010001: self.RET    # Return to
+            0b00010001: self.RET,   # Return to
+            0b10100111: self.CMP,   # Compare
+            0b01010100: self.JMP,   # Jump
+            0b01010101: self.JEQ,   # Jump Equal
+            0b01011010: self.JGE,   # Jump Greater than or Equal
+            0b01010111: self.JGT,   # Jump Greater than
+            0b01011001: self.JLE,   # Jump Less than or Equal
+            0b01011000: self.JLT,   # Jump Less than
+            0b01010110: self.JNE,   # Jump Not Equal
         }
 
-    def load(self, args):
+    def load(self, args=sys.argv):
         """Load a program into memory."""
 
         address = 0
@@ -68,6 +77,15 @@ class CPU:
             self.reg[reg_a] /= self.reg[reg_b]
         elif op == "MOD":
             self.reg[reg_a] %= self.reg[reg_b]
+        elif op == "CMP":
+            # clean the previous flag value or it will influence the bitwise or |
+            self.FL = 0b0
+            if self.reg[reg_a] == self.reg[reg_b]:
+                self.FL = self.FL | 0b00000001
+            if self.reg[reg_a] > self.reg[reg_b]:
+                self.FL = self.FL | 0b00000010
+            if self.reg[reg_a] < self.reg[reg_b]:
+                self.FL = self.FL | 0b00000100
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -142,7 +160,7 @@ class CPU:
         self.reg[self.sp] -= 1
         # plus 2 because its the current instruction + the next one + the actual one it should come to later when it does RET
         self.ram_write(self.reg[self.sp], self.PC + 2)
-        # minus two because this the operation size (op_size) is 1 and +1 after
+        # minus 2 because the operation size (op_size) is 1 and does another +1 after
         self.PC = self.reg[register] - 2
 
     def RET(self):
@@ -151,9 +169,63 @@ class CPU:
         and sets the PC (Program Counter) to it so that it returns to a given instruction
         """
 
-        # minus 1 because this the operation size (op_size) does +1 after
+        # minus 1 because the operation size (op_size) does does +1 after
         self.PC = self.ram_read(self.reg[self.sp]) - 1
         self.reg[self.sp] += 1
+
+    def CMP(self, register1, register2):
+        """
+        Compare Instruction
+
+        This is an instruction handled by the ALU.
+
+        FL bits: 00000LGE
+        L Less-than: during a CMP, set to 1 if registerA is less than registerB, zero otherwise.
+        G Greater-than: during a CMP, set to 1 if registerA is greater than registerB, zero otherwise.
+        E Equal: during a CMP, set to 1 if registerA is equal to registerB, zero otherwise.
+        """
+        self.alu("CMP", register1, register2)
+
+    def JMP(self, register):
+        # minus 2 because the operation size (op_size) is 1 and does another +1 after
+        self.PC = self.reg[register] - 2
+
+    def JEQ(self, register):
+        if self.FL & 0b00000001:
+            self.PC = self.reg[register] - 2
+        else:
+            self.PC += 2 - 2
+
+    def JGE(self, register):
+        # checks both flags Greater or Equal are set unlike (self.FL & 0b00000011) because it would force both at same time
+        if self.FL & 0b00000010 or self.FL & 0b00000001:
+            self.PC = self.reg[register] - 2
+        else:
+            self.PC += 2 - 2
+
+    def JGT(self, register):
+        if self.FL & 0b00000010:
+            self.PC = self.reg[register] - 2
+        else:
+            self.PC += 2 - 2
+
+    def JLE(self, register):
+        if self.FL & 0b00000100 or self.FL & 0b00000001:
+            self.PC = self.reg[register] - 2
+        else:
+            self.PC += 2 - 2
+
+    def JLT(self, register):
+        if self.FL & 0b00000100:
+            self.PC = self.reg[register] - 2
+        else:
+            self.PC += 2 - 2
+
+    def JNE(self, register):
+        if self.FL & 0b00000001 == 0:
+            self.PC = self.reg[register] - 2
+        else:
+            self.PC += 2 - 2
 
     def run(self):
         """Run the CPU."""

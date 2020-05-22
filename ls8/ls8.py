@@ -2,11 +2,10 @@
 
 """Main."""
 
-import sys
 from cpu import *
 import sys
 
 cpu = CPU()
 
-cpu.load(sys.argv)
+cpu.load()
 cpu.run()
