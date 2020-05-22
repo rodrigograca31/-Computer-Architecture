@@ -39,6 +39,12 @@ class CPU:
             0b01011001: self.JLE,   # Jump Less than or Equal
             0b01011000: self.JLT,   # Jump Less than
             0b01010110: self.JNE,   # Jump Not Equal
+            0b10101000: self.AND,   #
+            0b10101010: self.OR,    #
+            0b10101011: self.XOR,   #
+            0b01101001: self.NOT,   #
+            0b10101100: self.SHL,   # Shift left by reg B bits
+            0b10101101: self.SHR,   # Shift right by reg B bits
         }
 
     def load(self, args=sys.argv):
@@ -66,17 +72,17 @@ class CPU:
 
     def alu(self, op, reg_a, reg_b):
         """ALU (Arithmetic Logic Instructions) operations."""
-
+        """ 0xFF is used to mask(cut/slice) the size of the output to 255 (8 bits) since our machine is only 8 bits"""
         if op == "ADD":
-            self.reg[reg_a] += self.reg[reg_b]
+            self.reg[reg_a] += self.reg[reg_b] & 0xFF
         elif op == "SUB":
-            self.reg[reg_a] -= self.reg[reg_b]
+            self.reg[reg_a] -= self.reg[reg_b] & 0xFF
         elif op == "MUL":
-            self.reg[reg_a] *= self.reg[reg_b]
+            self.reg[reg_a] *= self.reg[reg_b] & 0xFF
         elif op == "DIV":
-            self.reg[reg_a] /= self.reg[reg_b]
+            self.reg[reg_a] /= self.reg[reg_b] & 0xFF
         elif op == "MOD":
-            self.reg[reg_a] %= self.reg[reg_b]
+            self.reg[reg_a] %= self.reg[reg_b] & 0xFF
         elif op == "CMP":
             # clean the previous flag value or it will influence the bitwise or |
             self.FL = 0b0
@@ -86,6 +92,20 @@ class CPU:
                 self.FL = self.FL | 0b00000010
             if self.reg[reg_a] < self.reg[reg_b]:
                 self.FL = self.FL | 0b00000100
+        elif op == "AND":
+            # normal "and" doesnt work. try "4 and 3" vs "4 & 3" and see the results
+            self.reg[reg_a] &= self.reg[reg_b]
+        elif op == "OR":
+            self.reg[reg_a] |= self.reg[reg_b]
+        elif op == "XOR":
+            self.reg[reg_a] ^= self.reg[reg_b]
+        elif op == "NOT":
+            self.reg[reg_a] = ~self.reg[reg_a]
+        elif op == "SHL":
+            self.reg[reg_a] <<= self.reg[reg_b] & 0xFF
+        elif op == "SHR":
+            self.reg[reg_a] >>= self.reg[reg_b] & 0xFF
+
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -133,6 +153,24 @@ class CPU:
 
     def MOD(self, a, b):
         self.alu("MOD", a, b)
+
+    def AND(self, a, b):
+        self.alu("AND", a, b)
+
+    def OR(self, a, b):
+        self.alu("OR", a, b)
+
+    def XOR(self, a, b):
+        self.alu("XOR", a, b)
+
+    def NOT(self, a, b):
+        self.alu("NOT", a, b)
+
+    def SHL(self, a, b):
+        self.alu("SHL", a, b)
+
+    def SHR(self, a, b):
+        self.alu("SHR", a, b)
 
     def PRN(self, position):
         print(self.reg[position])
